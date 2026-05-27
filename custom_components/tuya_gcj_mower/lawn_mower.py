@@ -10,6 +10,7 @@ from homeassistant.components.lawn_mower import (
     LawnMowerEntity,
     LawnMowerEntityFeature,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -17,7 +18,6 @@ from .const import (
     ACTION_DPCODE,
     STATUS_DPCODE,
     STATUS_TO_ACTIVITY,
-    TUYA_DOMAIN,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -33,19 +33,26 @@ async def async_setup_platform(
 ) -> None:
     """Set up Tuya lawn mowers."""
 
-    tuya_data = hass.data.get(TUYA_DOMAIN)
+    entries = hass.config_entries.async_entries("tuya")
 
-    if not tuya_data:
-        _LOGGER.error("Tuya integration not found")
-        return
+    _LOGGER.warning("TUYA ENTRIES FOUND: %s", len(entries))
 
     entities = []
 
-    for entry_data in tuya_data.values():
+    for entry in entries:
 
-        manager = getattr(entry_data, "manager", None)
+        _LOGGER.warning("TUYA ENTRY: %s", entry.entry_id)
+
+        runtime_data = getattr(entry, "runtime_data", None)
+
+        if runtime_data is None:
+            _LOGGER.warning("NO RUNTIME DATA")
+            continue
+
+        manager = getattr(runtime_data, "manager", None)
 
         if manager is None:
+            _LOGGER.warning("NO MANAGER")
             continue
 
         for device in manager.device_map.values():
@@ -56,6 +63,10 @@ async def async_setup_platform(
                 device.category,
             )
 
+            #
+            # IMPORTANTE:
+            # cambia "gcj" si el log muestra otra categoría
+            #
             if device.category != "gcj":
                 continue
 
@@ -65,6 +76,8 @@ async def async_setup_platform(
                     manager,
                 )
             )
+
+    _LOGGER.warning("TOTAL MOWERS FOUND: %s", len(entities))
 
     if entities:
         async_add_entities(entities)
@@ -94,11 +107,16 @@ class TuyaLawnMowerEntity(LawnMowerEntity):
         self._attr_unique_id = f"tuya_gcj_{device.id}"
 
         self._attr_device_info = {
-            "identifiers": {(TUYA_DOMAIN, device.id)},
+            "identifiers": {("tuya", device.id)},
             "name": device.name,
             "manufacturer": "Tuya",
             "model": device.product_name,
         }
+
+        _LOGGER.warning(
+            "ENTITY CREATED: %s",
+            device.name,
+        )
 
     @property
     def available(self) -> bool:
@@ -110,6 +128,12 @@ class TuyaLawnMowerEntity(LawnMowerEntity):
         """Return current activity."""
 
         status = self.device.status.get(STATUS_DPCODE)
+
+        _LOGGER.warning(
+            "DEVICE STATUS: %s -> %s",
+            self.device.name,
+            status,
+        )
 
         if status is None:
             return None
@@ -137,6 +161,12 @@ class TuyaLawnMowerEntity(LawnMowerEntity):
 
     async def _async_send_command(self, command: str) -> None:
         """Send command."""
+
+        _LOGGER.warning(
+            "SENDING COMMAND: %s -> %s",
+            self.device.name,
+            command,
+        )
 
         commands = [
             {
