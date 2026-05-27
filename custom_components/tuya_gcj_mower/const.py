@@ -1,11 +1,18 @@
-"""Constants for Tuya GCJ lawn mower custom integration."""
+"""Constants for Tuya GCJ lawn mower."""
+
+from enum import StrEnum
 
 from homeassistant.components.lawn_mower import LawnMowerActivity
 
-DOMAIN = "tuya_gcj_mower"
+TUYA_DOMAIN = "tuya"
 
 STATUS_DPCODE = "MachineStatus"
 ACTION_DPCODE = "MachineControlCmd"
+
+
+class DeviceCategory(StrEnum):
+    GCJ = "gcj"
+
 
 STATUS_TO_ACTIVITY: dict[str, LawnMowerActivity] = {
     "CHARGING": LawnMowerActivity.DOCKED,
