@@ -4,9 +4,6 @@
   "version": "0.1.0",
   "documentation": "https://github.com/MUbeira0/tuya-gcj-mower-hacs",
   "dependencies": ["tuya"],
-  "requirements": [],
   "codeowners": ["@MUbeira0"],
-  "iot_class": "cloud_push",
-  "platforms": ["lawn_mower"],
-  "integration_type": "hub"
+  "iot_class": "cloud_push"
 }

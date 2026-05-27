@@ -4,8 +4,6 @@ from homeassistant.components.lawn_mower import LawnMowerActivity
 
 DOMAIN = "tuya_gcj_mower"
 
-TUYA_DOMAIN = "tuya"
-
 STATUS_DPCODE = "MachineStatus"
 ACTION_DPCODE = "MachineControlCmd"
 
