@@ -1,9 +1,9 @@
 """Tuya gcj lawn mower custom integration."""
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.typing import ConfigType
 
 
-async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the Tuya gcj lawn mower custom integration."""
+    del hass, config
     return True
