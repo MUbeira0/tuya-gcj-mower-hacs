@@ -121,14 +121,55 @@ class TuyaLawnMowerEntity(LawnMowerEntity):
 
     @property
     def extra_state_attributes(self):
-        """Return debug attributes."""
+        """Return all Tuya raw attributes."""
 
-        return {
-            "raw_status": self.device.status,
-            "machine_status": self.device.status.get("MachineStatus"),
-            "machine_warning": self.device.status.get("MachineWarning"),
-            "machine_error": self.device.status.get("MachineError"),
-        }
+        attrs = {}
+
+        try:
+
+            #
+            # Status principal
+            #
+            attrs["raw_status"] = self.device.status
+
+            #
+            # Todos los atributos del device
+            #
+            for key, value in vars(self.device).items():
+
+                try:
+                    attrs[f"device_{key}"] = str(value)
+                except Exception:
+                    attrs[f"device_{key}"] = "ERROR"
+
+            #
+            # Todos los status
+            #
+            if hasattr(self.device, "status"):
+
+                for key, value in self.device.status.items():
+
+                    attrs[f"status_{key}"] = value
+
+            #
+            # Status range
+            #
+            if hasattr(self.device, "status_range"):
+
+                attrs["status_range"] = str(self.device.status_range)
+
+            #
+            # Functions
+            #
+            if hasattr(self.device, "function"):
+
+                attrs["function"] = str(self.device.function)
+
+        except Exception as err:
+
+            attrs["debug_error"] = str(err)
+
+        return attrs
 
     @property
     def activity(self) -> LawnMowerActivity:
