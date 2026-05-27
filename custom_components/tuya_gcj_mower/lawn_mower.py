@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from tuya_sharing import CustomerDevice, Manager
+
 
 from homeassistant.components.lawn_mower import (
     LawnMowerActivity,
@@ -16,6 +16,7 @@ from homeassistant.components.lawn_mower import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from typing import Any
 
 from .const import (
     ACTION_DPCODE,
@@ -66,7 +67,7 @@ async def async_setup_platform(
 @callback
 def _register_manager_discovery(
     hass: HomeAssistant,
-    manager: Manager,
+    manager: Any,
     known_device_ids: set[str],
     async_add_entities: AddEntitiesCallback,
 ) -> None:
@@ -101,7 +102,7 @@ def _register_manager_discovery(
     async_dispatcher_connect(hass, TUYA_DISCOVERY_NEW, async_discover_device)
 
 
-class TuyaGcjLawnMowerEntity(TuyaEntityAdapter, LawnMowerEntity):
+class TuyaGcjLawnMowerEntity(LawnMowerEntity):
     """Representation of a Tuya gcj lawn mower."""
 
     _attr_name = None
@@ -153,8 +154,8 @@ class TuyaEntityAdapter:
 
     def __init__(
         self,
-        device: CustomerDevice,
-        device_manager: Manager,
+        device: Any,
+        device_manager: Any,
         description: LawnMowerEntityEntityDescription,
     ) -> None:
         """Initialize adapter with Tuya device metadata."""
@@ -162,9 +163,9 @@ class TuyaEntityAdapter:
         self._attr_device_info = {
             "identifiers": {(TUYA_DOMAIN, device.id)},
             "manufacturer": "Tuya",
-            "name": device.name,
-            "model": device.product_name,
-            "model_id": device.product_id,
+            "name": getattr(device, "name", None),
+            "model": getattr(device, "product_name", None),
+            "model_id": getattr(device, "product_id", None),
         }
         self.entity_description = description
         self.device = device
@@ -178,39 +179,47 @@ class TuyaEntityAdapter:
     async def async_added_to_hass(self) -> None:
         """Register for Tuya state update dispatcher signals."""
         self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass,
-                f"tuya_entry_update_{self.device.id}",
-                self._handle_state_update,
-            )
-        )
+                @property
+                def available(self) -> bool:
+                    """Return if the device is available."""
+                    return getattr(self.device, "online", True)
 
-    async def _handle_state_update(
-        self,
-        updated_status_properties: list[str] | None,
-        dp_timestamps: dict[str, int] | None,
-    ) -> None:
-        """Handle updates from Tuya coordinator."""
-        if (
-            updated_status_properties is None
-            or await self._process_device_update(updated_status_properties, dp_timestamps)
-        ):
-            self.async_write_ha_state()
+                async def async_added_to_hass(self) -> None:
+                    """Register for Tuya state update dispatcher signals."""
+                    self.async_on_remove(
+                        async_dispatcher_connect(
+                            self.hass,
+                            f"tuya_entry_update_{self.device.id}",
+                            self._handle_state_update,
+                        )
+                    )
 
-    async def _process_device_update(
-        self,
-        updated_status_properties: list[str],
-        dp_timestamps: dict[str, int] | None,
-    ) -> bool:
-        """Process update payload and decide if HA state should be written."""
-        return True
+                async def _handle_state_update(
+                    self,
+                    updated_status_properties: list[str] | None,
+                    dp_timestamps: dict[str, int] | None,
+                ) -> None:
+                    """Handle updates from Tuya coordinator."""
+                    if (
+                        updated_status_properties is None
+                        or await self._process_device_update(updated_status_properties, dp_timestamps)
+                    ):
+                        self.async_write_ha_state()
 
-    async def _async_send_commands(self, commands: list[dict[str, Any]]) -> None:
-        """Send commands through Tuya manager."""
-        if not commands:
-            return
-        await self.hass.async_add_executor_job(
-            self.device_manager.send_commands,
-            self.device.id,
-            commands,
-        )
+                async def _process_device_update(
+                    self,
+                    updated_status_properties: list[str],
+                    dp_timestamps: dict[str, int] | None,
+                ) -> bool:
+                    """Process update payload and decide if HA state should be written."""
+                    return True
+
+                async def _async_send_commands(self, commands: list[dict[str, Any]]) -> None:
+                    """Send commands through Tuya manager."""
+                    if not commands:
+                        return
+                    await self.hass.async_add_executor_job(
+                        self.device_manager.send_commands,
+                        self.device.id,
+                        commands,
+                    )
