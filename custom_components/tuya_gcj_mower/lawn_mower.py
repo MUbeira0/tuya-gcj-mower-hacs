@@ -36,6 +36,13 @@ async def async_setup_entry(
     entities = []
 
     for device in manager.device_map.values():
+
+        _LOGGER.warning(
+            "TUYA DEVICE: %s | category=%s",
+            device.name,
+            device.category,
+        )
+
         if device.category != "gcj":
             continue
 
