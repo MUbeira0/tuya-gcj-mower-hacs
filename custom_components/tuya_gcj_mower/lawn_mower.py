@@ -36,43 +36,32 @@ async def async_setup_entry(
 
     tuya_entries = hass.config_entries.async_entries("tuya")
 
-    _LOGGER.warning(
-        "TUYA CONFIG ENTRIES FOUND: %s",
-        len(tuya_entries),
-    )
-
     entities = []
 
     for tuya_entry in tuya_entries:
 
-        _LOGGER.warning(
-            "PROCESSING TUYA ENTRY: %s",
-            tuya_entry.entry_id,
-        )
-
         runtime_data = getattr(tuya_entry, "runtime_data", None)
 
         if runtime_data is None:
-            _LOGGER.warning("NO RUNTIME DATA")
             continue
 
         manager = getattr(runtime_data, "manager", None)
 
         if manager is None:
-            _LOGGER.warning("NO MANAGER")
             continue
 
         for device in manager.device_map.values():
 
             _LOGGER.warning(
-                "TUYA DEVICE FOUND: %s | category=%s",
+                "DEVICE FOUND: %s | category=%s | status=%s",
                 device.name,
                 device.category,
+                device.status,
             )
 
             #
             # IMPORTANTE:
-            # cambia "gcj" si el log muestra otra categoría
+            # cambia gcj si el log muestra otra categoría
             #
             if device.category != "gcj":
                 continue
@@ -84,10 +73,7 @@ async def async_setup_entry(
                 )
             )
 
-    _LOGGER.warning(
-        "TOTAL MOWERS FOUND: %s",
-        len(entities),
-    )
+    _LOGGER.warning("TOTAL ENTITIES: %s", len(entities))
 
     if entities:
         async_add_entities(entities)
@@ -109,7 +95,7 @@ class TuyaLawnMowerEntity(LawnMowerEntity):
         device: Any,
         device_manager: Any,
     ) -> None:
-        """Initialize Tuya lawn mower."""
+        """Initialize mower."""
 
         self.device = device
         self.device_manager = device_manager
@@ -134,28 +120,84 @@ class TuyaLawnMowerEntity(LawnMowerEntity):
         return self.device.online
 
     @property
-    def activity(self) -> LawnMowerActivity | None:
-        """Return current activity."""
+    def extra_state_attributes(self):
+        """Return debug attributes."""
+
+        return {
+            "raw_status": self.device.status,
+            "machine_status": self.device.status.get("MachineStatus"),
+            "machine_warning": self.device.status.get("MachineWarning"),
+            "machine_error": self.device.status.get("MachineError"),
+        }
+
+    @property
+    def activity(self) -> LawnMowerActivity:
+        """Return mower activity."""
 
         status = self.device.status.get(STATUS_DPCODE)
 
         _LOGGER.warning(
-            "DEVICE STATUS: %s -> %s",
+            "ACTIVITY STATUS: %s -> %s",
             self.device.name,
             status,
         )
 
+        #
+        # Si no existe status
+        #
         if status is None:
-            return None
 
-        return STATUS_TO_ACTIVITY.get(status)
+            #
+            # Intentar fallback
+            #
+            for key, value in self.device.status.items():
+
+                _LOGGER.warning(
+                    "STATUS KEY: %s = %s",
+                    key,
+                    value,
+                )
+
+                #
+                # Buscar enums parecidos
+                #
+                if isinstance(value, str):
+
+                    mapped = STATUS_TO_ACTIVITY.get(value)
+
+                    if mapped:
+                        return mapped
+
+            return LawnMowerActivity.ERROR
+
+        #
+        # Estado conocido
+        #
+        mapped = STATUS_TO_ACTIVITY.get(status)
+
+        if mapped:
+            return mapped
+
+        _LOGGER.warning(
+            "UNKNOWN STATUS RECEIVED: %s",
+            status,
+        )
+
+        return LawnMowerActivity.ERROR
 
     async def async_start_mowing(self) -> None:
         """Start mowing."""
 
+        current_status = self.device.status.get(STATUS_DPCODE)
+
+        _LOGGER.warning(
+            "START COMMAND | CURRENT STATUS: %s",
+            current_status,
+        )
+
         command = (
             "ContinueWork"
-            if self.device.status.get(STATUS_DPCODE) == "PAUSED"
+            if current_status == "PAUSED"
             else "StartMowing"
         )
 
@@ -163,20 +205,20 @@ class TuyaLawnMowerEntity(LawnMowerEntity):
 
     async def async_pause(self) -> None:
         """Pause mowing."""
+
+        _LOGGER.warning("PAUSE COMMAND")
+
         await self._async_send_command("PauseWork")
 
     async def async_dock(self) -> None:
-        """Return mower to dock."""
+        """Return to dock."""
+
+        _LOGGER.warning("DOCK COMMAND")
+
         await self._async_send_command("StartReturnStation")
 
     async def _async_send_command(self, command: str) -> None:
-        """Send command."""
-
-        _LOGGER.warning(
-            "SENDING COMMAND: %s -> %s",
-            self.device.name,
-            command,
-        )
+        """Send command to device."""
 
         commands = [
             {
@@ -185,8 +227,29 @@ class TuyaLawnMowerEntity(LawnMowerEntity):
             }
         ]
 
-        await self.hass.async_add_executor_job(
-            self.device_manager.send_commands,
-            self.device.id,
+        _LOGGER.warning(
+            "SENDING COMMAND: %s",
             commands,
         )
+
+        try:
+
+            result = await self.hass.async_add_executor_job(
+                self.device_manager.send_commands,
+                self.device.id,
+                commands,
+            )
+
+            _LOGGER.warning(
+                "COMMAND RESULT: %s",
+                result,
+            )
+
+        except Exception as err:
+
+            _LOGGER.exception(
+                "COMMAND FAILED: %s",
+                err,
+            )
+
+            raise
