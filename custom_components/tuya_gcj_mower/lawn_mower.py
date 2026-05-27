@@ -22,6 +22,7 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+_LOGGER.warning("TUYA GCJ MOWER LOADED")
 
 
 async def async_setup_entry(
