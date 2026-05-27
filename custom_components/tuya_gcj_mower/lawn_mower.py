@@ -1,0 +1,216 @@
+"""Lawn mower platform for Tuya gcj devices."""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from tuya_sharing import CustomerDevice, Manager
+
+from homeassistant.components.lawn_mower import (
+    LawnMowerActivity,
+    LawnMowerEntity,
+    LawnMowerEntityEntityDescription,
+    LawnMowerEntityFeature,
+)
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+from .const import (
+    ACTION_DPCODE,
+    DOMAIN,
+    STATUS_DPCODE,
+    STATUS_TO_ACTIVITY,
+    TUYA_DISCOVERY_NEW,
+    TUYA_DOMAIN,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+
+async def async_setup_platform(
+    hass: HomeAssistant,
+    config: dict[str, Any],
+    async_add_entities: AddEntitiesCallback,
+    discovery_info: dict[str, Any] | None = None,
+) -> None:
+    """Set up Tuya gcj mowers from loaded Tuya config entries."""
+    del config, discovery_info
+
+    tuya_entries = hass.config_entries.async_entries(TUYA_DOMAIN)
+    if not tuya_entries:
+        _LOGGER.warning(
+            "No Tuya config entries found. Configure Tuya first, then restart Home Assistant."
+        )
+        return
+
+    known_device_ids: set[str] = set()
+
+    for entry in tuya_entries:
+        listener = getattr(entry, "runtime_data", None)
+        manager = getattr(listener, "manager", None)
+
+        if manager is None:
+            _LOGGER.debug("Skipping Tuya entry %s because runtime manager is missing", entry.entry_id)
+            continue
+
+        _register_manager_discovery(
+            hass,
+            manager,
+            known_device_ids,
+            async_add_entities,
+        )
+
+
+@callback
+def _register_manager_discovery(
+    hass: HomeAssistant,
+    manager: Manager,
+    known_device_ids: set[str],
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Register initial and dynamic discovery for one Tuya manager."""
+
+    @callback
+    def async_discover_device(device_ids: list[str]) -> None:
+        """Discover and add supported gcj devices."""
+        entities: list[TuyaGcjLawnMowerEntity] = []
+
+        for device_id in device_ids:
+            if device_id in known_device_ids:
+                continue
+
+            device = manager.device_map.get(device_id)
+            if device is None or device.category != "gcj":
+                continue
+
+            known_device_ids.add(device_id)
+            entities.append(
+                TuyaGcjLawnMowerEntity(
+                    device=device,
+                    device_manager=manager,
+                    description=LawnMowerEntityEntityDescription(key=""),
+                )
+            )
+
+        if entities:
+            async_add_entities(entities)
+
+    async_discover_device([*manager.device_map])
+    async_dispatcher_connect(hass, TUYA_DISCOVERY_NEW, async_discover_device)
+
+
+class TuyaGcjLawnMowerEntity(TuyaEntityAdapter, LawnMowerEntity):
+    """Representation of a Tuya gcj lawn mower."""
+
+    _attr_name = None
+    _attr_supported_features = (
+        LawnMowerEntityFeature.START_MOWING
+        | LawnMowerEntityFeature.PAUSE
+        | LawnMowerEntityFeature.DOCK
+    )
+
+    @property
+    def activity(self) -> LawnMowerActivity | None:
+        """Map Tuya MachineStatus to Home Assistant lawn mower activity."""
+        value = self.device.status.get(STATUS_DPCODE)
+        if value is None:
+            return None
+        return STATUS_TO_ACTIVITY.get(value)
+
+    async def _process_device_update(
+        self,
+        updated_status_properties: list[str],
+        _dp_timestamps: dict[str, int] | None,
+    ) -> bool:
+        """Only write state when activity DP changed."""
+        return STATUS_DPCODE in updated_status_properties
+
+    async def async_start_mowing(self) -> None:
+        """Start mowing or continue when paused."""
+        command = "ContinueWork" if self.device.status.get(STATUS_DPCODE) == "PAUSED" else "StartMowing"
+        await self._async_send_commands([{"code": ACTION_DPCODE, "value": command}])
+
+    async def async_pause(self) -> None:
+        """Pause mowing."""
+        await self._async_send_commands(
+            [{"code": ACTION_DPCODE, "value": "PauseWork"}]
+        )
+
+    async def async_dock(self) -> None:
+        """Return to dock/base."""
+        await self._async_send_commands(
+            [{"code": ACTION_DPCODE, "value": "StartReturnStation"}]
+        )
+
+
+class TuyaEntityAdapter:
+    """Minimal Tuya entity adapter for custom integration."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+
+    def __init__(
+        self,
+        device: CustomerDevice,
+        device_manager: Manager,
+        description: LawnMowerEntityEntityDescription,
+    ) -> None:
+        """Initialize adapter with Tuya device metadata."""
+        self._attr_unique_id = f"{DOMAIN}.{device.id}{description.key}"
+        self._attr_device_info = {
+            "identifiers": {(TUYA_DOMAIN, device.id)},
+            "manufacturer": "Tuya",
+            "name": device.name,
+            "model": device.product_name,
+            "model_id": device.product_id,
+        }
+        self.entity_description = description
+        self.device = device
+        self.device_manager = device_manager
+
+    @property
+    def available(self) -> bool:
+        """Return if the device is available."""
+        return self.device.online
+
+    async def async_added_to_hass(self) -> None:
+        """Register for Tuya state update dispatcher signals."""
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"tuya_entry_update_{self.device.id}",
+                self._handle_state_update,
+            )
+        )
+
+    async def _handle_state_update(
+        self,
+        updated_status_properties: list[str] | None,
+        dp_timestamps: dict[str, int] | None,
+    ) -> None:
+        """Handle updates from Tuya coordinator."""
+        if (
+            updated_status_properties is None
+            or await self._process_device_update(updated_status_properties, dp_timestamps)
+        ):
+            self.async_write_ha_state()
+
+    async def _process_device_update(
+        self,
+        updated_status_properties: list[str],
+        dp_timestamps: dict[str, int] | None,
+    ) -> bool:
+        """Process update payload and decide if HA state should be written."""
+        return True
+
+    async def _async_send_commands(self, commands: list[dict[str, Any]]) -> None:
+        """Send commands through Tuya manager."""
+        if not commands:
+            return
+        await self.hass.async_add_executor_job(
+            self.device_manager.send_commands,
+            self.device.id,
+            commands,
+        )

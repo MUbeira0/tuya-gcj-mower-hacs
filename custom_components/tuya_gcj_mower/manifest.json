@@ -1,0 +1,9 @@
+{
+  "domain": "tuya_gcj_mower",
+  "name": "Tuya GCJ Lawn Mower",
+  "codeowners": ["@MUbeira0"],
+  "documentation": "https://github.com/MUbeira0/tuya-gcj-mower-hacs",
+  "dependencies": ["tuya", "lawn_mower"],
+  "iot_class": "cloud_push",
+  "version": "0.1.0"
+}
