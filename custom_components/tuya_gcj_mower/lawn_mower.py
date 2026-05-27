@@ -8,7 +8,6 @@ from typing import Any
 from homeassistant.components.lawn_mower import (
     LawnMowerActivity,
     LawnMowerEntity,
-    LawnMowerEntityDescription,
     LawnMowerEntityFeature,
 )
 from homeassistant.config_entries import ConfigEntry
@@ -60,10 +59,6 @@ class TuyaGcjLawnMowerEntity(LawnMowerEntity):
         LawnMowerEntityFeature.START_MOWING
         | LawnMowerEntityFeature.PAUSE
         | LawnMowerEntityFeature.DOCK
-    )
-
-    entity_description = LawnMowerEntityDescription(
-        key="gcj_mower",
     )
 
     def __init__(self, device: Any, manager: Any) -> None:
