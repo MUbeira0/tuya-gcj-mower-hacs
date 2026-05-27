@@ -25,25 +25,32 @@ _LOGGER = logging.getLogger(__name__)
 _LOGGER.warning("TUYA GCJ MOWER LOADED")
 
 
-async def async_setup_platform(
+async def async_setup_entry(
     hass: HomeAssistant,
-    config: dict,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
-    discovery_info=None,
 ) -> None:
     """Set up Tuya lawn mowers."""
 
-    entries = hass.config_entries.async_entries("tuya")
+    _LOGGER.warning("ASYNC_SETUP_ENTRY STARTED")
 
-    _LOGGER.warning("TUYA ENTRIES FOUND: %s", len(entries))
+    tuya_entries = hass.config_entries.async_entries("tuya")
+
+    _LOGGER.warning(
+        "TUYA CONFIG ENTRIES FOUND: %s",
+        len(tuya_entries),
+    )
 
     entities = []
 
-    for entry in entries:
+    for tuya_entry in tuya_entries:
 
-        _LOGGER.warning("TUYA ENTRY: %s", entry.entry_id)
+        _LOGGER.warning(
+            "PROCESSING TUYA ENTRY: %s",
+            tuya_entry.entry_id,
+        )
 
-        runtime_data = getattr(entry, "runtime_data", None)
+        runtime_data = getattr(tuya_entry, "runtime_data", None)
 
         if runtime_data is None:
             _LOGGER.warning("NO RUNTIME DATA")
@@ -77,7 +84,10 @@ async def async_setup_platform(
                 )
             )
 
-    _LOGGER.warning("TOTAL MOWERS FOUND: %s", len(entities))
+    _LOGGER.warning(
+        "TOTAL MOWERS FOUND: %s",
+        len(entities),
+    )
 
     if entities:
         async_add_entities(entities)
