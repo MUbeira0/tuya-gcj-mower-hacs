@@ -46,7 +46,13 @@ async def async_setup_entry(
             continue
 
         manager = getattr(runtime_data, "manager", None)
-
+        try:
+            _LOGGER.warning(
+                "CUSTOMER API DIR: %s",
+                dir(manager.customer_api),
+            )
+        except Exception as err:
+            _LOGGER.warning("CUSTOMER API ERROR: %s", err)
         _LOGGER.warning("MANAGER TYPE: %s", type(manager))
 
         try:
