@@ -77,7 +77,20 @@ async def async_setup_entry(
                     "AFTER QUIRK STATUS_RANGE: %s",
                     device.status_range,
                 )
+                _LOGGER.warning(
+                    "AFTER QUIRK STATUS: %s",
+                    device.status,
+                )
 
+            if device.category != "gcj":
+                continue
+
+            entities.append(
+                TuyaLawnMowerEntity(
+                    device,
+                    manager,
+                )
+            )
 
     _LOGGER.warning("TOTAL ENTITIES: %s", len(entities))
 
