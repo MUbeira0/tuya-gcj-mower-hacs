@@ -47,6 +47,13 @@ async def async_setup_entry(
 
         manager = getattr(runtime_data, "manager", None)
 
+        _LOGGER.warning("MANAGER TYPE: %s", type(manager))
+
+        try:
+            _LOGGER.warning("MANAGER DIR: %s", dir(manager))
+        except Exception as err:
+            _LOGGER.warning("MANAGER DIR ERROR: %s", err)
+
         if manager is None:
             continue
 
