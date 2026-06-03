@@ -10,6 +10,7 @@ from homeassistant.components.lawn_mower import (
     LawnMowerEntity,
     LawnMowerEntityFeature,
 )
+from tuya_device_handlers import TUYA_QUIRKS_REGISTRY
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -65,53 +66,18 @@ async def async_setup_entry(
 
         for device in manager.device_map.values():
 
-            _LOGGER.warning("========== TUYA GCJ DEBUG ==========")
-            _LOGGER.warning("DEVICE NAME: %s", getattr(device, "name", None))
-            _LOGGER.warning("DEVICE ID: %s", getattr(device, "id", None))
-            _LOGGER.warning("CATEGORY: %s", getattr(device, "category", None))
-            _LOGGER.warning("PRODUCT ID: %s", getattr(device, "product_id", None))
+            if device.product_id == "icw5sal7xfcevsve":
+                TUYA_QUIRKS_REGISTRY.initialise_device_quirk(device)
 
-            try:
-                _LOGGER.warning("STATUS: %s", getattr(device, "status", None))
-            except Exception as err:
-                _LOGGER.warning("STATUS ERROR: %s", err)
-
-            try:
-                _LOGGER.warning("FUNCTION: %s", getattr(device, "function", None))
-            except Exception as err:
-                _LOGGER.warning("FUNCTION ERROR: %s", err)
-
-            try:
-                _LOGGER.warning("STATUS_RANGE: %s", getattr(device, "status_range", None))
-            except Exception as err:
-                _LOGGER.warning("STATUS_RANGE ERROR: %s", err)
-
-            try:
-                _LOGGER.warning("LOCAL_STRATEGY: %s", getattr(device, "local_strategy", None))
-            except Exception as err:
-                _LOGGER.warning("LOCAL_STRATEGY ERROR: %s", err)
-
-            try:
-                _LOGGER.warning("DEVICE VARS: %s", vars(device))
-            except Exception as err:
-                _LOGGER.warning("VARS ERROR: %s", err)
-
-            try:
-                _LOGGER.warning("DEVICE DIR: %s", dir(device))
-            except Exception as err:
-                _LOGGER.warning("DIR ERROR: %s", err)
-
-            _LOGGER.warning("====================================")
-
-            if device.category != "gcj":
-                continue
-
-            entities.append(
-                TuyaLawnMowerEntity(
-                    device,
-                    manager,
+                _LOGGER.warning(
+                    "AFTER QUIRK FUNCTION: %s",
+                    device.function,
                 )
-            )
+                _LOGGER.warning(
+                    "AFTER QUIRK STATUS_RANGE: %s",
+                    device.status_range,
+                )
+
 
     _LOGGER.warning("TOTAL ENTITIES: %s", len(entities))
 
