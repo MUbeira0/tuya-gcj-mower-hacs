@@ -52,17 +52,44 @@ async def async_setup_entry(
 
         for device in manager.device_map.values():
 
-            _LOGGER.warning(
-                "DEVICE FOUND: %s | category=%s | status=%s",
-                device.name,
-                device.category,
-                device.status,
-            )
+            _LOGGER.warning("========== TUYA GCJ DEBUG ==========")
+            _LOGGER.warning("DEVICE NAME: %s", getattr(device, "name", None))
+            _LOGGER.warning("DEVICE ID: %s", getattr(device, "id", None))
+            _LOGGER.warning("CATEGORY: %s", getattr(device, "category", None))
+            _LOGGER.warning("PRODUCT ID: %s", getattr(device, "product_id", None))
 
-            #
-            # IMPORTANTE:
-            # cambia gcj si el log muestra otra categoría
-            #
+            try:
+                _LOGGER.warning("STATUS: %s", getattr(device, "status", None))
+            except Exception as err:
+                _LOGGER.warning("STATUS ERROR: %s", err)
+
+            try:
+                _LOGGER.warning("FUNCTION: %s", getattr(device, "function", None))
+            except Exception as err:
+                _LOGGER.warning("FUNCTION ERROR: %s", err)
+
+            try:
+                _LOGGER.warning("STATUS_RANGE: %s", getattr(device, "status_range", None))
+            except Exception as err:
+                _LOGGER.warning("STATUS_RANGE ERROR: %s", err)
+
+            try:
+                _LOGGER.warning("LOCAL_STRATEGY: %s", getattr(device, "local_strategy", None))
+            except Exception as err:
+                _LOGGER.warning("LOCAL_STRATEGY ERROR: %s", err)
+
+            try:
+                _LOGGER.warning("DEVICE VARS: %s", vars(device))
+            except Exception as err:
+                _LOGGER.warning("VARS ERROR: %s", err)
+
+            try:
+                _LOGGER.warning("DEVICE DIR: %s", dir(device))
+            except Exception as err:
+                _LOGGER.warning("DIR ERROR: %s", err)
+
+            _LOGGER.warning("====================================")
+
             if device.category != "gcj":
                 continue
 
